@@ -32,10 +32,11 @@ A secure, internal marketing application with authentication and lead generation
      ```
    - Find Supabase values in: **Settings** → **API**
 
-4. **Run Database Migration**
+4. **Run Database Migrations**
    - Open Supabase SQL Editor
-   - Run the SQL from `supabase_migration.sql`
-   - This creates tables for projects, search terms, and leads
+   - First run the SQL from `supabase_migration.sql`
+   - Then run the SQL from `supabase_unique_leads_migration_v2.sql`
+   - This creates tables for projects, search terms, leads, unique leads, and project links
 
 5. **Install Dependencies**
    ```bash
@@ -60,14 +61,22 @@ A secure, internal marketing application with authentication and lead generation
 - ✅ Protected routes with middleware
 - ✅ Login/Sign-up toggle on one page
 
-### Lead Scraper (NEW)
+### Lead Scraper
 - ✅ Create and manage lead generation projects
 - ✅ Add multiple Google search terms per project
 - ✅ Scrape first 10 pages of Google business listings
 - ✅ Extract business data (name, address, phone, website, rating, reviews)
-- ✅ Automatic duplicate detection
+- ✅ Automatic duplicate detection (global across all projects)
 - ✅ Real-time status updates every 10 seconds
 - ✅ View collected leads in sortable table
+
+### All Leads (NEW)
+- ✅ View all unique leads across all projects in one place
+- ✅ Sortable table (business name, times found, rating, reviews, location, source, date)
+- ✅ Search and filter by any field (name, address, phone, email, website)
+- ✅ Source tracking (shows which project lead was first found in)
+- ✅ Times found counter (how many times business appeared)
+- ✅ Clickable contact information
 
 ### UI/UX
 - ✅ Modern UI with shadcn/ui components
@@ -93,6 +102,7 @@ A secure, internal marketing application with authentication and lead generation
 │   ├── auth/           # Authentication page
 │   ├── dashboard/
 │   │   ├── page.tsx    # Dashboard home
+│   │   ├── leads/      # All leads page (NEW)
 │   │   └── projects/   # Lead scraper projects
 │   └── page.tsx        # Root redirect
 ├── components/
@@ -100,6 +110,7 @@ A secure, internal marketing application with authentication and lead generation
 │   ├── projects-list.tsx
 │   ├── project-details.tsx
 │   ├── leads-table.tsx
+│   ├── all-leads-table.tsx  # NEW: All leads with sort/filter
 │   └── logout-button.tsx
 ├── lib/
 │   ├── supabase/       # Supabase clients
@@ -123,10 +134,16 @@ For detailed setup instructions and troubleshooting, see [SETUP.md](./SETUP.md)
 ## 🎯 Future Enhancements
 
 ### Lead Scraper
-- Export leads to CSV
-- Filter and sort capabilities
+- ✅ Sortable table (COMPLETED)
+- ✅ All Leads page (COMPLETED)
+- ✅ Global unique leads system (COMPLETED)
+- Export leads to CSV/Excel
+- Edit/update individual leads
+- Bulk operations (tag, delete, export)
+- Lead notes and custom fields
 - Email finding service integration
 - Scheduled automatic re-scraping
+- Lead scoring and prioritization
 
 ### New Features
 - Marketing campaign management
@@ -143,6 +160,8 @@ For detailed setup instructions and troubleshooting, see [SETUP.md](./SETUP.md)
 - **[QUICKSTART.md](./QUICKSTART.md)** - 3-minute quick start
 - **[Marketing_Web_App_PRD.md](./Marketing_Web_App_PRD.md)** - Auth MVP PRD
 - **[Lead_Scraper_PRD_Updated.md](./Lead_Scraper_PRD_Updated.md)** - Lead scraper PRD
+- **[UNIQUE_LEADS_SYSTEM.md](./UNIQUE_LEADS_SYSTEM.md)** - Unique leads architecture
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Vercel deployment guide
 
 ## 💰 Costs
 
