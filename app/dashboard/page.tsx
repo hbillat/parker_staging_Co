@@ -44,6 +44,12 @@ export default async function DashboardPage() {
                 >
                   Lead Scraper
                 </a>
+                <a 
+                  href="/dashboard/leads" 
+                  className="text-slate-600 hover:text-slate-900 font-medium"
+                >
+                  All Leads
+                </a>
               </nav>
             </div>
             <LogoutButton />
