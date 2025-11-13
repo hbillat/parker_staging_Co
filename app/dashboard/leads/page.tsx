@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AllLeadsTable from '@/components/all-leads-table'
+import EmailFinderButton from '@/components/email-finder-button'
 
 export default async function AllLeadsPage() {
   const supabase = await createClient()
@@ -92,6 +93,9 @@ export default async function AllLeadsPage() {
               View and manage all unique business leads across all your projects
             </p>
           </div>
+
+          {/* Email Finder Tool */}
+          <EmailFinderButton />
 
           <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
             <div className="mb-4 flex justify-between items-center">
