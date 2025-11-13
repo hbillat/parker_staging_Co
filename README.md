@@ -146,8 +146,21 @@ For detailed setup instructions and troubleshooting, see [SETUP.md](./SETUP.md)
 
 ## 💰 Costs
 
+- **Vercel**: Free Hobby tier (currently deployed)
 - **Supabase**: Free tier (sufficient for MVP)
 - **Google Places API**: $200/month free credit
   - ~$0.005 per search
   - ~$0.05 per search term (10 pages)
   - Monitor usage in Google Cloud Console
+
+## 🌐 Deployment
+
+**Status**: ✅ Deployed to Production
+
+- **Platform**: Vercel
+- **Repository**: [https://github.com/hbillat/parker_staging_Co](https://github.com/hbillat/parker_staging_Co)
+- **Environment Variables**: Configured for Production, Preview, and Development
+- **Automatic Deployments**: Enabled on push to main branch
+
+### Deployment Process
+See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete deployment instructions.
