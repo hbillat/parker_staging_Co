@@ -34,7 +34,57 @@ export interface Lead {
   address: string | null
   rating: number | null
   review_count: number | null
+  unique_lead_id: string | null
   created_at: string
+}
+
+// New: Unique Leads System
+export interface UniqueLead {
+  id: string
+  business_name: string
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  zip_code: string | null
+  country: string | null
+  website: string | null
+  google_url: string | null
+  rating: number | null
+  review_count: number | null
+  first_seen_at: string
+  last_updated_at: string
+  times_found: number
+  created_at: string
+}
+
+export interface ProjectLead {
+  id: string
+  project_id: string
+  unique_lead_id: string
+  search_term_id: string | null
+  found_at: string
+}
+
+export interface ProjectLeadDetailed extends ProjectLead {
+  business_name: string
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  website: string | null
+  google_url: string | null
+  rating: number | null
+  review_count: number | null
+  times_found: number
+  first_seen_at: string
+  last_updated_at: string
 }
 
 export interface ProjectWithSearchTerms extends Project {

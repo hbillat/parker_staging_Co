@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { searchPlaces, checkDuplicate } from '@/lib/google-places'
+import { searchPlaces, findOrCreateUniqueLead, isLeadInProject } from '@/lib/google-places'
 
 export async function POST(
   request: NextRequest,
@@ -97,21 +97,42 @@ async function performScraping(
 
         // Process each place
         for (const place of places) {
-          // Check for duplicate
-          const duplicateCheck = await checkDuplicate(
+          // Find or create unique lead
+          const uniqueLeadId = await findOrCreateUniqueLead(supabase, place)
+
+          if (!uniqueLeadId) {
+            console.error('Failed to create/find unique lead for:', place.business_name)
+            continue
+          }
+
+          // Check if this unique lead is already in this project
+          const alreadyInProject = await isLeadInProject(
             supabase,
             projectId,
-            place.business_name,
-            place.address
+            uniqueLeadId
           )
 
-          if (duplicateCheck.isDuplicate) {
+          if (alreadyInProject) {
             duplicatesRemoved++
             termDuplicatesCount++
             continue
           }
 
-          // Insert lead
+          // Link unique lead to this project
+          const { error: projectLeadError } = await supabase
+            .from('project_leads')
+            .insert({
+              project_id: projectId,
+              unique_lead_id: uniqueLeadId,
+              search_term_id: searchTerm.id,
+            })
+
+          if (projectLeadError) {
+            console.error('Error linking lead to project:', projectLeadError)
+            continue
+          }
+
+          // Also insert into leads table for backwards compatibility
           const { error: insertError } = await supabase.from('leads').insert({
             project_id: projectId,
             search_term_id: searchTerm.id,
@@ -123,6 +144,7 @@ async function performScraping(
             address: place.address,
             rating: place.rating,
             review_count: place.review_count,
+            unique_lead_id: uniqueLeadId,
           })
 
           if (!insertError) {
