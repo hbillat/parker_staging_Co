@@ -17,13 +17,21 @@ Internal marketing web application for Parker and Co Staging, built as an MVP wi
   - Automatic duplicate detection
   - Real-time status updates every 10 seconds
   - View and export collected leads per project
-- **All Leads Page** (NEW): Centralized view of all unique leads
+- **All Leads Page**: Centralized view of all unique leads
   - Sortable table with all lead data fields
   - Search/filter functionality across all fields
   - Source tracking (which project lead was first found in)
   - Date tracking (when lead was first discovered)
   - Times found counter (how many times lead appeared)
   - Clickable contact information (phone, email, website)
+- **Email Finder Feature** (NEW): Automatic email discovery for leads
+  - Web scraping to find emails from business websites
+  - Smart email scoring (prioritizes info@, contact@, etc.)
+  - Manual button to process 10 leads at a time
+  - Automatic hourly cron job (Vercel Cron)
+  - Optional Hunter.io API integration for better accuracy
+  - Shows stats (total leads, with email, ready to process)
+  - Real-time results with confidence levels
 - **Unique Leads System**: Global lead deduplication
   - `unique_leads` table stores one record per business
   - `project_leads` junction table links leads to projects
@@ -39,7 +47,7 @@ Internal marketing web application for Parker and Co Staging, built as an MVP wi
 - **UI Components**: shadcn/ui (Card, Button, Input, Label, Tabs, Dialog, Badge)
 - **Authentication**: Supabase Auth (email + password)
 - **Database**: Supabase PostgreSQL
-- **APIs**: Google Places API (New) for lead generation
+- **APIs**: Google Places API for lead generation, Hunter.io API (optional) for email finding
 - **State Management**: React hooks (useState, useRouter, useEffect)
 - **Date Formatting**: date-fns
 
@@ -50,6 +58,10 @@ Internal marketing web application for Parker and Co Staging, built as an MVP wi
 Parker_staging_Co/
 ├── app/
 │   ├── api/
+│   │   ├── cron/
+│   │   │   └── find-emails/route.ts  # Hourly email finder cron job (NEW)
+│   │   ├── leads/
+│   │   │   └── find-emails/route.ts  # Manual email finder API (NEW)
 │   │   └── projects/
 │   │       ├── create/route.ts   # Create new project API
 │   │       └── [id]/
@@ -60,7 +72,7 @@ Parker_staging_Co/
 │   ├── dashboard/
 │   │   ├── page.tsx              # Protected dashboard (server component)
 │   │   ├── leads/
-│   │   │   └── page.tsx          # All leads page (NEW)
+│   │   │   └── page.tsx          # All leads page with Email Finder
 │   │   └── projects/
 │   │       ├── page.tsx          # Projects list page
 │   │       └── [id]/page.tsx     # Project details page
@@ -81,18 +93,23 @@ Parker_staging_Co/
 │   ├── create-project-dialog.tsx # Create project modal
 │   ├── project-details.tsx       # Project details with live updates
 │   ├── leads-table.tsx           # Leads table display (per project)
-│   └── all-leads-table.tsx       # All leads table (NEW, sortable)
+│   ├── all-leads-table.tsx       # All leads table (sortable)
+│   └── email-finder-button.tsx   # Email finder UI component (NEW)
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts             # Browser Supabase client
 │   │   ├── server.ts             # Server Supabase client
 │   │   └── middleware.ts         # Middleware Supabase client
 │   ├── google-places.ts          # Google Places API integration
+│   ├── email-finder.ts           # Email finding logic (NEW)
 │   └── utils.ts                  # Utility functions (cn helper)
 ├── types/
 │   └── database.ts               # TypeScript types for DB models
 ├── middleware.ts                 # Route protection & auth refresh
-├── supabase_migration.sql        # Database schema
+├── supabase_migration.sql        # Database schema (initial)
+├── supabase_unique_leads_migration_v2.sql  # Unique leads system
+├── backfill_unique_leads_v2.sql  # Backfill existing leads
+├── vercel.json                   # Vercel cron job configuration (NEW)
 ├── .env.local                    # Environment variables (gitignored)
 ├── components.json               # shadcn/ui configuration
 └── [Documentation files]
@@ -279,9 +296,19 @@ Five main tables in Supabase:
 
 ### Required Variables (in `.env.local`)
 ```env
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://lsgwiofhjcnjkdgsubxp.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzZ3dpb2ZoamNuamtkZ3N1YnhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4OTM0MzksImV4cCI6MjA3ODQ2OTQzOX0.YMI5gVh_d3UO3N4mqjV9lTQLpOnmT-N1Cq0N9WTs_2o
+
+# Google Places API
 NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=AIzaSyCmcmZy8gMRbTo4jWcsHTAfIsYYoPT8-qE
+
+# Email Finder Cron Job (NEW - Required for automatic email finding)
+CRON_SECRET=your-random-secret-key-here
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-from-supabase
+
+# Email Finder Enhancement (NEW - Optional for better results)
+HUNTER_IO_API_KEY=your-hunter-api-key-optional
 ```
 
 ### Supabase Project Details
@@ -370,7 +397,7 @@ NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=AIzaSyCmcmZy8gMRbTo4jWcsHTAfIsYYoPT8-qE
      - Contact information (phone, email when available)
      - Rating and review count display
 
-7. **All Leads Page** (NEW)
+7. **All Leads Page**
    - **Centralized Lead View**:
      - View all unique leads across all projects in one place
      - Shows complete lead information with all fields
@@ -395,6 +422,38 @@ NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=AIzaSyCmcmZy8gMRbTo4jWcsHTAfIsYYoPT8-qE
      - Clickable email addresses (mailto: links)
      - Website and Google Maps links
      - Rating and review count
+
+8. **Email Finder Feature** (NEW)
+   - **Web Scraping Engine**:
+     - Automatically visits business websites
+     - Extracts email addresses using regex patterns
+     - Smart email scoring system
+     - Prioritizes business emails (info@, contact@, hello@, sales@)
+     - Filters out spam (noreply@, unsubscribe@, etc.)
+   - **Manual Email Finding**:
+     - Button on All Leads page
+     - Processes 10 leads at a time
+     - Shows real-time results with confidence levels
+     - Displays found emails with source (scraped/api)
+   - **Automatic Hourly Cron Job**:
+     - Runs every hour via Vercel Cron
+     - Processes 20 leads per hour
+     - Configured in vercel.json
+     - Secure authentication with CRON_SECRET
+   - **Hunter.io API Integration** (Optional):
+     - More accurate email finding
+     - Uses professional email database
+     - Free tier: 25 searches/month
+     - Returns confidence scores
+   - **Stats Dashboard**:
+     - Total leads count
+     - Leads with emails
+     - Leads with websites (ready to process)
+     - Leads without emails
+   - **Email Quality Scoring**:
+     - High priority: info@, contact@ (+30 points)
+     - Medium priority: hello@, sales@, support@ (+20-25 points)
+     - Filtered out: noreply@, no-reply@, donotreply@ (-50 points)
 
 ## Known Issues & Limitations
 
@@ -562,13 +621,15 @@ npm run lint
 - **Lead_Scraper_PRD_Updated.md**: Lead scraper feature requirements
 - **supabase_migration.sql**: Database schema for lead scraper (initial)
 - **supabase_unique_leads_migration_v2.sql**: Unique leads system schema
+- **backfill_unique_leads_v2.sql**: Backfill script for existing leads
 - **UNIQUE_LEADS_SYSTEM.md**: Documentation for unique leads architecture
+- **EMAIL_FINDER_SETUP.md**: Email finder setup and configuration guide
 - **CONTEXT.md**: This file - complete project context
 
 ## Last Updated
-- Date: November 13, 2024
-- Status: MVP Complete + Lead Scraper Feature Live + All Leads Page + DEPLOYED TO PRODUCTION
-- Last Major Change: Added All Leads page with sortable table and unique leads system
+- Date: November 14, 2024
+- Status: MVP Complete + Lead Scraper + All Leads + Email Finder + DEPLOYED TO PRODUCTION
+- Last Major Change: Added Email Finder feature with web scraping and hourly cron job
 - Features Complete:
   - Authentication system
   - Lead Scraper with real-time updates
@@ -577,13 +638,18 @@ npm run lint
   - Google Places API integration
   - All Leads page with search/sort/filter
   - Source tracking and lead intelligence
+  - Email Finder with web scraping
+  - Automatic hourly email finding (Vercel Cron)
+  - Optional Hunter.io API integration
 - Deployment:
   - Production: Deployed on Vercel
   - GitHub Repository: https://github.com/hbillat/parker_staging_Co
   - Environment: Production with all environment variables configured
   - Status: ✅ Live and Working
+  - Cron Jobs: Configured for hourly email finding
 - Database:
   - Unique leads system implemented
   - Migration: supabase_unique_leads_migration_v2.sql
+  - Backfill: backfill_unique_leads_v2.sql
   - Tables: projects, search_terms, leads, unique_leads, project_leads
 

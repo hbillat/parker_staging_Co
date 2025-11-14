@@ -70,13 +70,22 @@ A secure, internal marketing application with authentication and lead generation
 - ✅ Real-time status updates every 10 seconds
 - ✅ View collected leads in sortable table
 
-### All Leads (NEW)
+### All Leads
 - ✅ View all unique leads across all projects in one place
 - ✅ Sortable table (business name, times found, rating, reviews, location, source, date)
 - ✅ Search and filter by any field (name, address, phone, email, website)
 - ✅ Source tracking (shows which project lead was first found in)
 - ✅ Times found counter (how many times business appeared)
 - ✅ Clickable contact information
+
+### Email Finder (NEW)
+- ✅ Automatic email discovery from business websites
+- ✅ Web scraping with smart email scoring
+- ✅ Manual button to process 10 leads at a time
+- ✅ Automatic hourly cron job (processes 20 leads/hour)
+- ✅ Optional Hunter.io API integration for better accuracy
+- ✅ Real-time stats dashboard
+- ✅ Confidence levels (high/medium/low)
 
 ### UI/UX
 - ✅ Modern UI with shadcn/ui components
@@ -91,7 +100,8 @@ A secure, internal marketing application with authentication and lead generation
 - **UI Components**: shadcn/ui
 - **Authentication**: Supabase Auth
 - **Database**: Supabase PostgreSQL
-- **APIs**: Google Places API (New)
+- **APIs**: Google Places API, Hunter.io API (optional)
+- **Cron Jobs**: Vercel Cron for automated email finding
 - **Utilities**: date-fns, @googlemaps/google-maps-services-js
 
 ## 📁 Project Structure
@@ -161,6 +171,7 @@ For detailed setup instructions and troubleshooting, see [SETUP.md](./SETUP.md)
 - **[Marketing_Web_App_PRD.md](./Marketing_Web_App_PRD.md)** - Auth MVP PRD
 - **[Lead_Scraper_PRD_Updated.md](./Lead_Scraper_PRD_Updated.md)** - Lead scraper PRD
 - **[UNIQUE_LEADS_SYSTEM.md](./UNIQUE_LEADS_SYSTEM.md)** - Unique leads architecture
+- **[EMAIL_FINDER_SETUP.md](./EMAIL_FINDER_SETUP.md)** - Email finder setup guide
 - **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Vercel deployment guide
 
 ## 💰 Costs
