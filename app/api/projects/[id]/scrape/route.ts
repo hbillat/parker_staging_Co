@@ -82,18 +82,32 @@ async function performScraping(
   let duplicatesRemoved = 0
 
   // Set a timeout to mark project as failed if it takes too long
-  // This prevents projects from being stuck in "scraping" status forever
+  // Hobby plan: 10s limit, so we set timeout to 8s to have time to update DB
   const timeoutId = setTimeout(async () => {
-    console.error(`[Scraper] Timeout reached for project ${projectId}`)
-    await supabase
-      .from('projects')
-      .update({ 
-        status: 'failed',
-        total_leads: totalLeads,
-        duplicates_removed: duplicatesRemoved,
-      })
-      .eq('id', projectId)
-  }, 55000) // 55 seconds - just under Vercel's 60s limit for Pro, well over 10s free limit
+    console.error(`[Scraper] Timeout reached for project ${projectId} - marking as failed`)
+    try {
+      await supabase
+        .from('projects')
+        .update({ 
+          status: 'failed',
+          total_leads: totalLeads,
+          duplicates_removed: duplicatesRemoved,
+        })
+        .eq('id', projectId)
+      
+      // Also mark search terms as failed
+      await supabase
+        .from('search_terms')
+        .update({
+          status: 'failed',
+          progress_message: 'Timeout: Scraping took too long (Vercel 10s limit). Try upgrading to Pro for longer timeouts.',
+        })
+        .eq('project_id', projectId)
+        .eq('status', 'scraping')
+    } catch (err) {
+      console.error('[Scraper] Error updating timeout status:', err)
+    }
+  }, 8000) // 8 seconds - leaves 2 seconds buffer before Vercel's 10s hard limit
 
   try {
     for (const searchTerm of searchTerms) {
