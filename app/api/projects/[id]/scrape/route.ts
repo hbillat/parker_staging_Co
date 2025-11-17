@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { searchPlaces, findOrCreateUniqueLead, isLeadInProject } from '@/lib/google-places'
 
 export async function POST(
@@ -71,11 +72,28 @@ async function performScraping(
   searchTerms: any[],
   userId: string
 ) {
-  const supabase = await createClient()
+  // Use admin client for background job (bypasses RLS and doesn't need user session)
+  const supabase = createAdminClient()
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY!
+  
+  console.log(`[Scraper] Starting background scraping job for project ${projectId}`)
 
   let totalLeads = 0
   let duplicatesRemoved = 0
+
+  // Set a timeout to mark project as failed if it takes too long
+  // This prevents projects from being stuck in "scraping" status forever
+  const timeoutId = setTimeout(async () => {
+    console.error(`[Scraper] Timeout reached for project ${projectId}`)
+    await supabase
+      .from('projects')
+      .update({ 
+        status: 'failed',
+        total_leads: totalLeads,
+        duplicates_removed: duplicatesRemoved,
+      })
+      .eq('id', projectId)
+  }, 55000) // 55 seconds - just under Vercel's 60s limit for Pro, well over 10s free limit
 
   try {
     for (const searchTerm of searchTerms) {
@@ -191,6 +209,9 @@ async function performScraping(
     }
 
     // Update project as completed
+    clearTimeout(timeoutId) // Cancel the timeout since we completed successfully
+    console.log(`[Scraper] Completed project ${projectId}: ${totalLeads} leads, ${duplicatesRemoved} duplicates`)
+    
     await supabase
       .from('projects')
       .update({
@@ -200,10 +221,16 @@ async function performScraping(
       })
       .eq('id', projectId)
   } catch (error) {
-    console.error('Error in scraping process:', error)
+    clearTimeout(timeoutId) // Cancel the timeout since we're handling the error
+    console.error('[Scraper] Error in scraping process:', error)
+    
     await supabase
       .from('projects')
-      .update({ status: 'failed' })
+      .update({ 
+        status: 'failed',
+        total_leads: totalLeads,
+        duplicates_removed: duplicatesRemoved,
+      })
       .eq('id', projectId)
   }
 }

@@ -24,6 +24,7 @@ export default function ProjectDetails({
   const [searchTerms, setSearchTerms] = useState<SearchTerm[]>(initialSearchTerms)
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [isStarting, setIsStarting] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -82,6 +83,40 @@ export default function ProjectDetails({
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsStarting(false)
+    }
+  }
+
+  const handleResetProject = async () => {
+    if (!confirm('Reset this project? This will allow you to restart scraping.')) {
+      return
+    }
+
+    setIsResetting(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/reset`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to reset project')
+      }
+
+      // Update project status locally
+      setProject((prev) => ({ ...prev, status: 'draft' }))
+      
+      // Update search terms to show they're pending
+      setSearchTerms((prev) =>
+        prev.map((term) => ({ ...term, status: 'pending' as const, progress_message: null }))
+      )
+
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setIsResetting(false)
     }
   }
 
@@ -146,15 +181,27 @@ export default function ProjectDetails({
             Created {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
           </p>
         </div>
-        {project.status === 'draft' && (
-          <Button
-            onClick={handleStartScraping}
-            disabled={isStarting}
-            size="lg"
-          >
-            {isStarting ? 'Starting...' : 'Start Scraping'}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {project.status === 'draft' && (
+            <Button
+              onClick={handleStartScraping}
+              disabled={isStarting}
+              size="lg"
+            >
+              {isStarting ? 'Starting...' : 'Start Scraping'}
+            </Button>
+          )}
+          {(project.status === 'scraping' || project.status === 'failed') && (
+            <Button
+              onClick={handleResetProject}
+              disabled={isResetting}
+              variant="outline"
+              size="lg"
+            >
+              {isResetting ? 'Resetting...' : 'Reset & Retry'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (
