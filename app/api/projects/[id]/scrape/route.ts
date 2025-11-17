@@ -90,7 +90,10 @@ async function performScraping(
 
       try {
         // Search Google Places
+        console.log(`[Scraper] Starting search for term: ${searchTerm.term}`)
         const places = await searchPlaces(searchTerm.term, apiKey)
+
+        console.log(`[Scraper] Found ${places.length} places for term: ${searchTerm.term}`)
 
         let termLeadsCount = 0
         let termDuplicatesCount = 0
@@ -153,6 +156,8 @@ async function performScraping(
           }
         }
 
+        console.log(`[Scraper] Completed term "${searchTerm.term}": ${termLeadsCount} new leads, ${termDuplicatesCount} duplicates`)
+
         // Update search term as completed
         await supabase
           .from('search_terms')
@@ -163,12 +168,23 @@ async function performScraping(
           })
           .eq('id', searchTerm.id)
       } catch (error) {
-        console.error(`Error scraping search term ${searchTerm.term}:`, error)
+        console.error(`[Scraper] Error scraping search term ${searchTerm.term}:`, error)
+        
+        // Get detailed error message
+        let errorMessage = 'Failed to scrape this search term'
+        if (error instanceof Error) {
+          errorMessage = error.message
+          // Truncate if too long
+          if (errorMessage.length > 200) {
+            errorMessage = errorMessage.substring(0, 200) + '...'
+          }
+        }
+        
         await supabase
           .from('search_terms')
           .update({
             status: 'failed',
-            progress_message: 'Failed to scrape this search term',
+            progress_message: `Error: ${errorMessage}`,
           })
           .eq('id', searchTerm.id)
       }

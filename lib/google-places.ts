@@ -22,9 +22,13 @@ export async function searchPlaces(
   let pagesScraped = 0
   const maxPages = 10
 
+  console.log(`[Google Places] Starting search for: "${searchQuery}"`)
+
   try {
     // Fetch up to 10 pages of results
     while (pagesScraped < maxPages) {
+      console.log(`[Google Places] Fetching page ${pagesScraped + 1}/${maxPages}`)
+      
       const response = await client.textSearch({
         params: {
           query: searchQuery,
@@ -33,41 +37,66 @@ export async function searchPlaces(
         },
       })
 
+      console.log(`[Google Places] API Response Status: ${response.data.status}`)
+
+      // Check for API errors
+      if (response.data.status === 'REQUEST_DENIED') {
+        console.error('[Google Places] REQUEST_DENIED - API key may be invalid or restricted')
+        throw new Error(`Google Places API error: ${response.data.error_message || 'REQUEST_DENIED - Check API key configuration'}`)
+      }
+
+      if (response.data.status === 'OVER_QUERY_LIMIT') {
+        console.error('[Google Places] OVER_QUERY_LIMIT - API quota exceeded')
+        throw new Error('Google Places API quota exceeded. Please try again later.')
+      }
+
+      if (response.data.status === 'INVALID_REQUEST') {
+        console.error('[Google Places] INVALID_REQUEST - Check search query')
+        throw new Error(`Invalid search query: "${searchQuery}"`)
+      }
+
       if (response.data.results && response.data.results.length > 0) {
+        console.log(`[Google Places] Found ${response.data.results.length} results on page ${pagesScraped + 1}`)
+        
         // Process each place
         for (const place of response.data.results) {
-          // Get place details for more information
-          const detailsResponse = await client.placeDetails({
-            params: {
-              place_id: place.place_id!,
-              key: apiKey,
-              fields: [
-                'name',
-                'formatted_address',
-                'formatted_phone_number',
-                'website',
-                'rating',
-                'user_ratings_total',
-                'url',
-              ],
-            },
-          })
+          try {
+            // Get place details for more information
+            const detailsResponse = await client.placeDetails({
+              params: {
+                place_id: place.place_id!,
+                key: apiKey,
+                fields: [
+                  'name',
+                  'formatted_address',
+                  'formatted_phone_number',
+                  'website',
+                  'rating',
+                  'user_ratings_total',
+                  'url',
+                ],
+              },
+            })
 
-          const details = detailsResponse.data.result
+            const details = detailsResponse.data.result
 
-          results.push({
-            business_name: details.name || place.name || 'Unknown',
-            google_url: details.url || null,
-            website: details.website || null,
-            phone: details.formatted_phone_number || null,
-            email: null, // Google Places API doesn't provide email
-            address: details.formatted_address || place.formatted_address || null,
-            rating: details.rating || null,
-            review_count: details.user_ratings_total || null,
-          })
+            results.push({
+              business_name: details.name || place.name || 'Unknown',
+              google_url: details.url || null,
+              website: details.website || null,
+              phone: details.formatted_phone_number || null,
+              email: null, // Google Places API doesn't provide email
+              address: details.formatted_address || place.formatted_address || null,
+              rating: details.rating || null,
+              review_count: details.user_ratings_total || null,
+            })
 
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100))
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 100))
+          } catch (detailsError) {
+            console.error(`[Google Places] Error fetching details for place ${place.place_id}:`, detailsError)
+            // Continue with other places even if one fails
+          }
         }
 
         pagesScraped++
@@ -76,19 +105,26 @@ export async function searchPlaces(
         nextPageToken = response.data.next_page_token
 
         if (!nextPageToken) {
+          console.log(`[Google Places] No more pages available after page ${pagesScraped}`)
           break // No more pages
         }
 
         // Google requires a short delay before using next_page_token
+        console.log('[Google Places] Waiting 2s before fetching next page...')
         await new Promise(resolve => setTimeout(resolve, 2000))
       } else {
+        console.log(`[Google Places] No results found on page ${pagesScraped + 1}`)
         break // No results
       }
     }
 
+    console.log(`[Google Places] Search completed. Total results: ${results.length}`)
     return results
   } catch (error) {
-    console.error('Error searching places:', error)
+    console.error('[Google Places] Error searching places:', error)
+    if (error instanceof Error) {
+      throw new Error(`Google Places API error: ${error.message}`)
+    }
     throw error
   }
 }
