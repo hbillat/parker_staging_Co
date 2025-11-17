@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import LeadsTable from '@/components/leads-table'
 import { Project, SearchTerm, Lead, ProjectStatus } from '@/types/database'
 import { formatDistanceToNow } from 'date-fns'
@@ -25,6 +33,8 @@ export default function ProjectDetails({
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [isStarting, setIsStarting] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -120,6 +130,30 @@ export default function ProjectDetails({
     }
   }
 
+  const handleDeleteProject = async () => {
+    setIsDeleting(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/delete`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete project')
+      }
+
+      // Redirect to projects list
+      router.push('/dashboard/projects')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'completed':
@@ -201,6 +235,14 @@ export default function ProjectDetails({
               {isResetting ? 'Resetting...' : 'Reset & Retry'}
             </Button>
           )}
+          <Button
+            onClick={() => setShowDeleteDialog(true)}
+            disabled={isDeleting}
+            variant="destructive"
+            size="lg"
+          >
+            Delete Project
+          </Button>
         </div>
       </div>
 
@@ -297,6 +339,44 @@ export default function ProjectDetails({
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{project.name}&quot;?
+              <br />
+              <br />
+              This will permanently delete:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>The project</li>
+                <li>All search terms ({searchTerms.length})</li>
+                <li>All collected leads ({project.total_leads})</li>
+              </ul>
+              <br />
+              <strong className="text-red-600">This action cannot be undone.</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProject}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Yes, Delete Project'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
