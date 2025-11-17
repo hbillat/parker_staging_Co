@@ -20,12 +20,14 @@ export async function searchPlaces(
   const results: PlaceResult[] = []
   let nextPageToken: string | undefined = undefined
   let pagesScraped = 0
-  const maxPages = 10
+  // Reduced from 10 to 3 pages to stay under Vercel's 10-second timeout limit
+  // This gives ~60 leads per search term instead of 200, but completes reliably
+  const maxPages = 3
 
   console.log(`[Google Places] Starting search for: "${searchQuery}"`)
 
   try {
-    // Fetch up to 10 pages of results
+    // Fetch up to 3 pages of results (~60 leads)
     while (pagesScraped < maxPages) {
       console.log(`[Google Places] Fetching page ${pagesScraped + 1}/${maxPages}`)
       
