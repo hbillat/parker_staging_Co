@@ -61,8 +61,12 @@ export async function searchPlaces(
       if (response.data.results && response.data.results.length > 0) {
         console.log(`[Google Places] Found ${response.data.results.length} results on page ${pagesScraped + 1}`)
         
+        // Limit to 10 results to stay under 10s timeout (Hobby plan limitation)
+        const limitedResults = response.data.results.slice(0, 10)
+        console.log(`[Google Places] Processing ${limitedResults.length} results (limited for Hobby plan)`)
+        
         // Process each place
-        for (const place of response.data.results) {
+        for (const place of limitedResults) {
           try {
             // Get place details for more information
             const detailsResponse = await client.placeDetails({
