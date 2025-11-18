@@ -7,6 +7,8 @@ export interface Project {
   status: 'draft' | 'scraping' | 'completed' | 'failed'
   total_leads: number
   duplicates_removed: number
+  temp_leads_count: number
+  leads_processed: boolean
   created_at: string
   updated_at: string
 }
@@ -58,6 +60,23 @@ export interface UniqueLead {
   first_seen_at: string
   last_updated_at: string
   times_found: number
+  created_at: string
+}
+
+export interface TempScrapedLead {
+  id: string
+  project_id: string
+  search_term_id: string
+  business_name: string
+  google_url: string | null
+  website: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  rating: number | null
+  review_count: number | null
+  scraped_at: string
+  processed: boolean
   created_at: string
 }
 

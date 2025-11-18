@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { searchPlaces, findOrCreateUniqueLead, isLeadInProject } from '@/lib/google-places'
+import { searchPlaces } from '@/lib/google-places'
 
 export async function POST(
   request: NextRequest,
@@ -76,13 +76,12 @@ async function performScraping(
   const supabase = createAdminClient()
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY!
   
-  console.log(`[Scraper] Starting background scraping job for project ${projectId}`)
+  console.log(`[Scraper] Starting FAST scraping job for project ${projectId} - saving to temp table only`)
 
-  let totalLeads = 0
-  let duplicatesRemoved = 0
+  let totalTempLeads = 0
 
   // Set a timeout to mark project as failed if it takes too long
-  // Hobby plan: 10s limit, so we set timeout to 8s to have time to update DB
+  // With temp storage, this should be much faster (~3-4 seconds for 10 leads)
   const timeoutId = setTimeout(async () => {
     console.error(`[Scraper] Timeout reached for project ${projectId} - marking as failed`)
     try {
@@ -90,8 +89,7 @@ async function performScraping(
         .from('projects')
         .update({ 
           status: 'failed',
-          total_leads: totalLeads,
-          duplicates_removed: duplicatesRemoved,
+          temp_leads_count: totalTempLeads,
         })
         .eq('id', projectId)
       
@@ -100,7 +98,7 @@ async function performScraping(
         .from('search_terms')
         .update({
           status: 'failed',
-          progress_message: 'Timeout: Scraping took too long (Vercel 10s limit). Try upgrading to Pro for longer timeouts.',
+          progress_message: 'Timeout: Scraping took too long. Try again or contact support.',
         })
         .eq('project_id', projectId)
         .eq('status', 'scraping')
@@ -121,54 +119,17 @@ async function performScraping(
         .eq('id', searchTerm.id)
 
       try {
-        // Search Google Places
+        // Search Google Places (FAST - no duplicate checking!)
         console.log(`[Scraper] Starting search for term: ${searchTerm.term}`)
         const places = await searchPlaces(searchTerm.term, apiKey)
 
         console.log(`[Scraper] Found ${places.length} places for term: ${searchTerm.term}`)
 
         let termLeadsCount = 0
-        let termDuplicatesCount = 0
 
-        // Process each place
+        // Save to temp table (FAST - just insert, no checking!)
         for (const place of places) {
-          // Find or create unique lead
-          const uniqueLeadId = await findOrCreateUniqueLead(supabase, place)
-
-          if (!uniqueLeadId) {
-            console.error('Failed to create/find unique lead for:', place.business_name)
-            continue
-          }
-
-          // Check if this unique lead is already in this project
-          const alreadyInProject = await isLeadInProject(
-            supabase,
-            projectId,
-            uniqueLeadId
-          )
-
-          if (alreadyInProject) {
-            duplicatesRemoved++
-            termDuplicatesCount++
-            continue
-          }
-
-          // Link unique lead to this project
-          const { error: projectLeadError } = await supabase
-            .from('project_leads')
-            .insert({
-              project_id: projectId,
-              unique_lead_id: uniqueLeadId,
-              search_term_id: searchTerm.id,
-            })
-
-          if (projectLeadError) {
-            console.error('Error linking lead to project:', projectLeadError)
-            continue
-          }
-
-          // Also insert into leads table for backwards compatibility
-          const { error: insertError } = await supabase.from('leads').insert({
+          const { error: insertError } = await supabase.from('temp_scraped_leads').insert({
             project_id: projectId,
             search_term_id: searchTerm.id,
             business_name: place.business_name,
@@ -179,16 +140,16 @@ async function performScraping(
             address: place.address,
             rating: place.rating,
             review_count: place.review_count,
-            unique_lead_id: uniqueLeadId,
+            processed: false,
           })
 
           if (!insertError) {
-            totalLeads++
+            totalTempLeads++
             termLeadsCount++
           }
         }
 
-        console.log(`[Scraper] Completed term "${searchTerm.term}": ${termLeadsCount} new leads, ${termDuplicatesCount} duplicates`)
+        console.log(`[Scraper] Saved ${termLeadsCount} leads to temp storage for term "${searchTerm.term}"`)
 
         // Update search term as completed
         await supabase
@@ -196,7 +157,7 @@ async function performScraping(
           .update({
             status: 'completed',
             leads_count: termLeadsCount,
-            progress_message: `Found ${termLeadsCount} leads (${termDuplicatesCount} duplicates removed)`,
+            progress_message: `Scraped ${termLeadsCount} leads - Click "Add as Leads" to process`,
           })
           .eq('id', searchTerm.id)
       } catch (error) {
@@ -224,14 +185,14 @@ async function performScraping(
 
     // Update project as completed
     clearTimeout(timeoutId) // Cancel the timeout since we completed successfully
-    console.log(`[Scraper] Completed project ${projectId}: ${totalLeads} leads, ${duplicatesRemoved} duplicates`)
+    console.log(`[Scraper] Completed project ${projectId}: ${totalTempLeads} leads saved to temp storage`)
     
     await supabase
       .from('projects')
       .update({
         status: 'completed',
-        total_leads: totalLeads,
-        duplicates_removed: duplicatesRemoved,
+        temp_leads_count: totalTempLeads,
+        leads_processed: false,
       })
       .eq('id', projectId)
   } catch (error) {
@@ -242,8 +203,7 @@ async function performScraping(
       .from('projects')
       .update({ 
         status: 'failed',
-        total_leads: totalLeads,
-        duplicates_removed: duplicatesRemoved,
+        temp_leads_count: totalTempLeads,
       })
       .eq('id', projectId)
   }
