@@ -61,9 +61,10 @@ export async function searchPlaces(
       if (response.data.results && response.data.results.length > 0) {
         console.log(`[Google Places] Found ${response.data.results.length} results on page ${pagesScraped + 1}`)
         
-        // Limit to 10 results to stay under 10s timeout (Hobby plan limitation)
-        const limitedResults = response.data.results.slice(0, 10)
-        console.log(`[Google Places] Processing ${limitedResults.length} results (limited for Hobby plan)`)
+        // Limit to 5 results to stay well under 8s timeout (Hobby plan hard limit)
+        // Google API alone takes 5+ seconds, so we need to minimize processing
+        const limitedResults = response.data.results.slice(0, 5)
+        console.log(`[Google Places] Processing ${limitedResults.length} results (Hobby plan limitation)`)
         
         // Process each place
         for (const place of limitedResults) {
