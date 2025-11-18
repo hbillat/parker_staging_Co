@@ -34,8 +34,10 @@ export default function ProjectDetails({
   const [isStarting, setIsStarting] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const router = useRouter()
 
   // Poll for status updates every 10 seconds when scraping
@@ -154,6 +156,53 @@ export default function ProjectDetails({
     }
   }
 
+  const handleProcessLeads = async () => {
+    setIsProcessing(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/process-leads`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to start processing')
+      }
+
+      setSuccess('Processing leads in background... This may take a minute.')
+      
+      // Poll for completion
+      const checkInterval = setInterval(async () => {
+        router.refresh()
+        const statusResponse = await fetch(`/api/projects/${project.id}/status`)
+        if (statusResponse.ok) {
+          const status = await statusResponse.json()
+          if (status.project && status.project.leads_processed) {
+            clearInterval(checkInterval)
+            setSuccess('Leads processed successfully!')
+            setIsProcessing(false)
+            router.refresh()
+          }
+        }
+      }, 3000) // Check every 3 seconds
+
+      // Stop checking after 2 minutes
+      setTimeout(() => {
+        clearInterval(checkInterval)
+        if (isProcessing) {
+          setSuccess('Processing is taking longer than expected. Refresh the page to check status.')
+          setIsProcessing(false)
+        }
+      }, 120000)
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      setIsProcessing(false)
+    }
+  }
+
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'completed':
@@ -225,6 +274,25 @@ export default function ProjectDetails({
               {isStarting ? 'Starting...' : 'Start Scraping'}
             </Button>
           )}
+          {project.status === 'completed' && !project.leads_processed && project.temp_leads_count > 0 && (
+            <Button
+              onClick={handleProcessLeads}
+              disabled={isProcessing}
+              size="lg"
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isProcessing ? 'Processing...' : 'Add as Leads'}
+            </Button>
+          )}
+          {project.status === 'completed' && project.leads_processed && (
+            <Button
+              disabled
+              size="lg"
+              className="bg-gray-400 cursor-not-allowed"
+            >
+              ✓ Added as Leads
+            </Button>
+          )}
           {(project.status === 'scraping' || project.status === 'failed') && (
             <Button
               onClick={handleResetProject}
@@ -252,18 +320,39 @@ export default function ProjectDetails({
         </div>
       )}
 
+      {success && (
+        <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+          {success}
+        </div>
+      )}
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium text-slate-600">
-              Total Leads
+              Scraped Leads
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-slate-900">
+            <div className="text-3xl font-bold text-blue-600">
+              {project.temp_leads_count || 0}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Ready to process</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-slate-600">
+              Added Leads
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">
               {project.total_leads}
             </div>
+            <p className="text-xs text-slate-500 mt-1">Unique & processed</p>
           </CardContent>
         </Card>
 
