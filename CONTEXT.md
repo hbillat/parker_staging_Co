@@ -3,7 +3,7 @@
 ## Project Overview
 Internal marketing web application for Parker and Co Staging, built as an MVP with secure authentication as the foundation for future marketing campaign management features.
 
-## Current Status: ✅ MVP COMPLETE & LEAD SCRAPER FEATURE LIVE
+## Current Status: ✅ MVP COMPLETE & OPTIMIZED FOR LOCAL DEVELOPMENT
 
 ### What's Been Built
 - **Authentication System**: Fully functional login/signup with Supabase
@@ -12,11 +12,12 @@ Internal marketing web application for Parker and Co Staging, built as an MVP wi
 - **Lead Scraper Feature**: Generate business leads from Google searches
   - Create and manage multiple lead scraper projects
   - Add multiple search terms per project
-  - Scrape up to 10 pages of Google business listings per search term
+  - Scrape up to 3 pages of Google business listings per search term (~60 leads per term)
   - Extract business data (name, address, phone, website, rating, reviews)
   - Automatic duplicate detection
   - Real-time status updates every 10 seconds
   - View and export collected leads per project
+  - **Optimized for local development** (no timeout constraints)
 - **All Leads Page**: Centralized view of all unique leads
   - Sortable table with all lead data fields
   - Search/filter functionality across all fields
@@ -223,9 +224,10 @@ Five main tables in Supabase:
 - Uses `@googlemaps/google-maps-services-js` library
 - Searches using Text Search API
 - Fetches Place Details for each result
-- Scrapes up to 10 pages per search term
+- Scrapes up to 3 pages per search term (~60 leads per term)
 - Rate limited with delays to avoid API throttling
 - Extracts: name, address, phone, website, rating, review count, Google URL
+- **Optimized for local development**: No timeout constraints, processes all results
 
 #### Duplicate Detection
 **Global Level (Unique Leads Table)**:
@@ -250,7 +252,8 @@ Five main tables in Supabase:
 - Updates project stats and search term progress
 - Stops polling when status changes to 'completed' or 'failed'
 
-#### Scraping Flow
+#### Scraping Flow (Two-Phase Process)
+**Phase 1: Fast Scraping** (saves to temporary table)
 1. User creates project with name and search terms
 2. Project saved as 'draft' in database
 3. User clicks "Start Scraping"
@@ -259,25 +262,39 @@ Five main tables in Supabase:
 6. Background process starts:
    - For each search term:
      - Update term status to 'scraping'
-     - Call Google Places API for up to 10 pages
+     - Call Google Places API for up to 3 pages (~60 leads)
      - For each result:
-       - **Step 1**: Check/create unique lead in `unique_leads` table
-         - If exists: Get unique lead ID, increment `times_found`
-         - If new: Create record, set `times_found` to 1
-       - **Step 2**: Check if unique lead already in this project (`project_leads`)
-         - If already in project: Skip (count as duplicate)
-         - If not in project: Link to project via `project_leads`
-       - **Step 3**: Also insert to `leads` table (backwards compatibility)
-     - Update term as 'completed' with lead count
+       - Save to `temp_scraped_leads` table (NO duplicate checking yet)
+     - Update term as 'completed' with scraped count
 7. After all terms processed:
    - Update project status to 'completed'
-   - Set total lead count and duplicates removed
+   - Set `temp_leads_count` with total scraped leads
 8. Frontend polls and displays real-time progress
+
+**Phase 2: Process Leads** (triggered by "Add as Leads" button)
+1. User clicks "Add as Leads" button on completed project
+2. API route `/api/projects/[id]/process-leads` triggered
+3. Processes all leads from `temp_scraped_leads`:
+   - For each temp lead:
+     - **Step 1**: Check/create unique lead in `unique_leads` table
+       - If exists: Get unique lead ID, increment `times_found`
+       - If new: Create record, set `times_found` to 1
+     - **Step 2**: Check if unique lead already in this project (`project_leads`)
+       - If already in project: Skip (count as duplicate)
+       - If not in project: Link to project via `project_leads`
+     - **Step 3**: Also insert to `leads` table (backwards compatibility)
+     - Mark temp lead as `processed = true`
+4. Update project `leads_processed = true`
+5. Button changes to "Added as Leads" (disabled)
 
 #### API Routes
 - **POST /api/projects/create**: Create new project with search terms
-- **POST /api/projects/[id]/scrape**: Start scraping process (background job)
+- **POST /api/projects/[id]/scrape**: Start scraping process (saves to temp table)
+- **POST /api/projects/[id]/process-leads**: Process temp leads into main tables (duplicate checking)
+- **POST /api/projects/[id]/reset**: Reset project status to allow retry
 - **GET /api/projects/[id]/status**: Get current project status and search term progress
+- **POST /api/leads/find-emails**: Manual email finding (10 leads at a time)
+- **GET /api/cron/find-emails**: Automatic hourly email finding (requires CRON_SECRET)
 
 #### UI Components
 - **ProjectsList**: Displays all user's projects with status badges
@@ -463,10 +480,14 @@ HUNTER_IO_API_KEY=your-hunter-api-key-optional
 3. **No User Profile**: No user profile page or settings
 4. **No Email Verification**: Disabled for MVP simplicity
 5. **No Export Feature**: Can't export leads to CSV/Excel (yet)
-6. **No Email Extraction**: Google Places API doesn't provide email addresses
+6. **Limited Email Extraction**: Google Places API doesn't provide emails (use Email Finder feature)
 7. **API Rate Limits**: Google Places API has rate limits and costs after free tier
 8. **No Lead Editing**: Can't manually edit/update lead information
 9. **No Bulk Operations**: Can't delete or tag multiple leads at once
+10. **Local Development Only**: Optimized for local development, not Vercel deployment
+    - Vercel Hobby plan has 10-second function timeout
+    - Full scraping (3 pages) requires local environment
+    - For Vercel deployment, would need Pro plan or reduced scraping scope
 
 ### Resolved Issues
 - ✅ Email confirmation requirement (disabled in Supabase)
@@ -588,9 +609,10 @@ npm run lint
 ## Troubleshooting - Lead Scraper
 
 ### Scraping takes too long
-- Each search term scrapes 10 pages which can take 2-3 minutes
+- Each search term scrapes 3 pages which can take 1-2 minutes
 - Google API has rate limits and requires delays between requests
-- Consider reducing number of search terms or pages
+- Two-phase process: scraping is fast, processing leads is separate
+- Consider reducing number of search terms if still too slow
 
 ### No leads found
 - Check if search term is too specific
@@ -606,7 +628,8 @@ npm run lint
 ### API costs concern
 - Google provides $200/month free credit
 - Each search costs ~$0.005
-- 10 pages per search term ≈ $0.05
+- 3 pages per search term ≈ $0.015
+- ~60 leads per search term
 - Monitor usage in Google Cloud Console
 - Set up budget alerts
 
@@ -627,9 +650,9 @@ npm run lint
 - **CONTEXT.md**: This file - complete project context
 
 ## Last Updated
-- Date: November 14, 2024
-- Status: MVP Complete + Lead Scraper + All Leads + Email Finder + DEPLOYED TO PRODUCTION
-- Last Major Change: Added Email Finder feature with web scraping and hourly cron job
+- Date: November 19, 2024
+- Status: MVP Complete + Lead Scraper + All Leads + Email Finder + OPTIMIZED FOR LOCAL DEVELOPMENT
+- Last Major Change: Removed Vercel timeout constraints, optimized for local development with full scraping capabilities (3 pages per search term)
 - Features Complete:
   - Authentication system
   - Lead Scraper with real-time updates
@@ -642,14 +665,15 @@ npm run lint
   - Automatic hourly email finding (Vercel Cron)
   - Optional Hunter.io API integration
 - Deployment:
-  - Production: Deployed on Vercel
+  - Development: Optimized for local development (no timeout constraints)
   - GitHub Repository: https://github.com/hbillat/parker_staging_Co
-  - Environment: Production with all environment variables configured
-  - Status: ✅ Live and Working
-  - Cron Jobs: Configured for hourly email finding
+  - Environment: Local development recommended for full scraping capabilities
+  - Status: ✅ Working on Local Development
+  - Note: Vercel Hobby plan has 10s timeout - not suitable for full scraping
 - Database:
   - Unique leads system implemented
-  - Migration: supabase_unique_leads_migration_v2.sql
+  - Two-phase scraping process (temp table + processing)
+  - Migration: supabase_migration.sql, supabase_unique_leads_migration_v2.sql, supabase_temp_leads_migration.sql
   - Backfill: backfill_unique_leads_v2.sql
-  - Tables: projects, search_terms, leads, unique_leads, project_leads
+  - Tables: projects, search_terms, leads, unique_leads, project_leads, temp_scraped_leads
 

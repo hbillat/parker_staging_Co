@@ -20,15 +20,13 @@ export async function searchPlaces(
   const results: PlaceResult[] = []
   let nextPageToken: string | undefined = undefined
   let pagesScraped = 0
-  // Reduced to 1 page to stay well under Vercel's 10-second timeout limit on Hobby plan
-  // This gives ~20 leads per search term, but completes reliably
-  // For more leads: add multiple search terms OR upgrade to Vercel Pro ($20/month)
-  const maxPages = 1
+  // Fetch up to 3 pages of results (up to 60 leads per search term)
+  const maxPages = 3
 
   console.log(`[Google Places] Starting search for: "${searchQuery}"`)
 
   try {
-    // Fetch 1 page of results (~20 leads) - fast and reliable on Hobby plan
+    // Fetch up to maxPages of results
     while (pagesScraped < maxPages) {
       console.log(`[Google Places] Fetching page ${pagesScraped + 1}/${maxPages}`)
       
@@ -61,13 +59,11 @@ export async function searchPlaces(
       if (response.data.results && response.data.results.length > 0) {
         console.log(`[Google Places] Found ${response.data.results.length} results on page ${pagesScraped + 1}`)
         
-        // Limit to 5 results to stay well under 8s timeout (Hobby plan hard limit)
-        // Google API alone takes 5+ seconds, so we need to minimize processing
-        const limitedResults = response.data.results.slice(0, 5)
-        console.log(`[Google Places] Processing ${limitedResults.length} results (Hobby plan limitation)`)
+        // Process ALL results from this page
+        console.log(`[Google Places] Processing all ${response.data.results.length} results`)
         
         // Process each place
-        for (const place of limitedResults) {
+        for (const place of response.data.results) {
           try {
             // Get place details for more information
             const detailsResponse = await client.placeDetails({

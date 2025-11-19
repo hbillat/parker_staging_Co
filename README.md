@@ -64,11 +64,13 @@ A secure, internal marketing application with authentication and lead generation
 ### Lead Scraper
 - ✅ Create and manage lead generation projects
 - ✅ Add multiple Google search terms per project
-- ✅ Scrape first 10 pages of Google business listings
+- ✅ Scrape up to 3 pages of Google business listings (~60 leads per term)
 - ✅ Extract business data (name, address, phone, website, rating, reviews)
+- ✅ Two-phase process: fast scraping + separate lead processing
 - ✅ Automatic duplicate detection (global across all projects)
 - ✅ Real-time status updates every 10 seconds
 - ✅ View collected leads in sortable table
+- ✅ **Optimized for local development** (no timeout constraints)
 
 ### All Leads
 - ✅ View all unique leads across all projects in one place
@@ -176,21 +178,28 @@ For detailed setup instructions and troubleshooting, see [SETUP.md](./SETUP.md)
 
 ## 💰 Costs
 
-- **Vercel**: Free Hobby tier (currently deployed)
+- **Vercel**: Free Hobby tier (local development recommended)
 - **Supabase**: Free tier (sufficient for MVP)
 - **Google Places API**: $200/month free credit
   - ~$0.005 per search
-  - ~$0.05 per search term (10 pages)
+  - ~$0.015 per search term (3 pages)
+  - ~60 leads per search term
   - Monitor usage in Google Cloud Console
 
 ## 🌐 Deployment
 
-**Status**: ✅ Deployed to Production
+**Status**: ✅ Optimized for Local Development
 
-- **Platform**: Vercel
+- **Platform**: Local development (recommended)
 - **Repository**: [https://github.com/hbillat/parker_staging_Co](https://github.com/hbillat/parker_staging_Co)
-- **Environment Variables**: Configured for Production, Preview, and Development
-- **Automatic Deployments**: Enabled on push to main branch
+- **Environment Variables**: Configure in `.env.local` for local development
+- **Vercel Limitation**: Hobby plan has 10-second function timeout - not suitable for full scraping
+
+### Why Local Development?
+- **No timeouts**: Run scraping jobs for as long as needed
+- **Full results**: Get up to 60 leads per search term (3 pages)
+- **Cost-effective**: No need for Vercel Pro plan ($20/month)
+- **Easy setup**: Just `npm run dev` and you're ready to go
 
 ### Deployment Process
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete deployment instructions.
+For deployment instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md). Note that Vercel deployment requires either Pro plan or reducing scraping scope to 1 page (5 leads).

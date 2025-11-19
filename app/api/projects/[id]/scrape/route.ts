@@ -80,32 +80,7 @@ async function performScraping(
 
   let totalTempLeads = 0
 
-  // Set a timeout to mark project as failed if it takes too long
-  // With temp storage, this should be much faster (~3-4 seconds for 10 leads)
-  const timeoutId = setTimeout(async () => {
-    console.error(`[Scraper] Timeout reached for project ${projectId} - marking as failed`)
-    try {
-      await supabase
-        .from('projects')
-        .update({ 
-          status: 'failed',
-          temp_leads_count: totalTempLeads,
-        })
-        .eq('id', projectId)
-      
-      // Also mark search terms as failed
-      await supabase
-        .from('search_terms')
-        .update({
-          status: 'failed',
-          progress_message: 'Timeout: Scraping took too long. Try again or contact support.',
-        })
-        .eq('project_id', projectId)
-        .eq('status', 'scraping')
-    } catch (err) {
-      console.error('[Scraper] Error updating timeout status:', err)
-    }
-  }, 8000) // 8 seconds - leaves 2 seconds buffer before Vercel's 10s hard limit
+  // No timeout for local development - let it run as long as needed
 
   try {
     for (const searchTerm of searchTerms) {
@@ -184,7 +159,6 @@ async function performScraping(
     }
 
     // Update project as completed
-    clearTimeout(timeoutId) // Cancel the timeout since we completed successfully
     console.log(`[Scraper] Completed project ${projectId}: ${totalTempLeads} leads saved to temp storage`)
     
     await supabase
@@ -196,7 +170,6 @@ async function performScraping(
       })
       .eq('id', projectId)
   } catch (error) {
-    clearTimeout(timeoutId) // Cancel the timeout since we're handling the error
     console.error('[Scraper] Error in scraping process:', error)
     
     await supabase
